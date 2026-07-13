@@ -1,0 +1,14 @@
+# Render（https://render.com）へのデプロイ設定
+# このファイルがあると、Renderがリポジトリを読み込んで自動でセットアップしてくれる。
+# 使い方は README の「各端末でURLを開くだけにする（デプロイ）」を参照。
+services:
+  - type: web
+    name: hatsuden-ou
+    runtime: node
+    plan: free
+    # devDependencies も含めてインストールしてからビルド（vite等はビルド時に必要）
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
