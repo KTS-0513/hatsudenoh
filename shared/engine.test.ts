@@ -210,10 +210,10 @@ describe('ミッションの特別ルール', () => {
     expect(isBanned(card('coal'), m)).toBe(true);
     expect(isBanned(card('oil'), m)).toBe(true);
     expect(isBanned(card('lng'), m)).toBe(false);
-    // 判定でもルール違反として未達成になる
+    // 出禁カードを使うと大幅減点され、完全クリアにならない
     const [r] = judgeMatch(m, event('rainy-season'), [entry('A', ['coal'])], PLANT_CARDS);
     expect(r.cleared).toBe(false);
-    expect(r.missedReasons.some((x) => x.includes('ルール違反'))).toBe(true);
+    expect(r.breakdown.some((b) => b.label.includes('出禁') && b.value < 0)).toBe(true);
   });
 
   it('「地方創生」では大規模発電（原子力・石炭・大型ダム水力）が出禁', () => {
@@ -235,17 +235,16 @@ describe('ミッションの特別ルール', () => {
     expect(r.cards.find((c) => c.cardId === 'oil')!.final.output).toBe(10); // 5+5（冬）
   });
 
-  it('「半導体工場」は系統安定/ベースロード電源が1枚もないとクリアできない', () => {
+  it('「半導体工場」は系統安定/ベースロード電源が1枚もないと必須条件が未達で減点', () => {
     const m = mission('semiconductor');
-    // 発電量18・安全性12を満たしても、必須カードがなければ未達成
     const [without] = judgeMatch(
       m,
       event('rainy-season'),
-      [entry('A', ['coal', 'lng', 'oil'])], // 合計: 出力15…条件も足りないが必須条件の理由が出ることを確認
+      [entry('A', ['coal', 'lng', 'oil'])], // 必須カードなし
       PLANT_CARDS,
     );
-    expect(without.cleared).toBe(false);
-    expect(without.missedReasons.some((x) => x.includes('条件未達成'))).toBe(true);
+    expect(without.conditionStatus.some((c) => !c.ok && c.label.includes('系統安定'))).toBe(true);
+    expect(without.breakdown.some((b) => b.label.includes('必須カードなし'))).toBe(true);
 
     const [withStab] = judgeMatch(
       m,
@@ -253,7 +252,7 @@ describe('ミッションの特別ルール', () => {
       [entry('A', ['coal', 'lng', 'nuclear'])], // 原子力=ベースロード電源
       PLANT_CARDS,
     );
-    expect(withStab.missedReasons.some((x) => x.includes('条件未達成'))).toBe(false);
+    expect(withStab.conditionStatus.some((c) => !c.ok && c.label.includes('系統安定'))).toBe(false);
   });
 
   it('「燃料価格の急騰」ミッション中は石油バックアップの加算が+3になる', () => {
@@ -267,15 +266,16 @@ describe('ミッションの特別ルール', () => {
     expect(r.cards.find((c) => c.cardId === 'oil')!.final.output).toBe(8); // 5+3
   });
 
-  it('複合条件（燃料急騰: 発電量15・効率14・自給率12）をすべて満たさないとクリアできない', () => {
+  it('複合条件（燃料急騰）を満たさない手でも、スコアは計算され完全クリアにはならない', () => {
     const [r] = judgeMatch(
       mission('fuel-price-surge'),
       event('rainy-season'),
-      [entry('A', ['dam-hydro', 'geothermal', 'cogen'])], // 出力8で足りない
+      [entry('A', ['dam-hydro', 'geothermal', 'cogen'])], // 出力8で発電量条件に届かない
       PLANT_CARDS,
     );
     expect(r.cleared).toBe(false);
-    expect(r.missedReasons.some((x) => x.includes('発電量'))).toBe(true);
+    expect(r.conditionStatus.some((c) => !c.ok && c.label.includes('発電量'))).toBe(true);
+    expect(r.score).toBeGreaterThan(0); // それでもスコアは入る
   });
 });
 
@@ -302,53 +302,52 @@ describe('LNG【バックアップ】（対戦相手の停止も参照）', () =
   });
 });
 
-describe('ミッションの達成可能性（調整後の目標値）', () => {
-  // どのミッションも「3枚上限」で届く組み合わせが存在することを保証する
+describe('ミッションの完全クリア可能性（3枚上限）', () => {
+  // どのミッションも「3枚」で完全クリアできる組み合わせが存在することを保証する
   const winningCombos: Record<string, { cards: string[]; optionalOn?: string[] }> = {
-    'environment-summit': { cards: ['nuclear', 'onshore-wind', 'biomass'] }, // 出力10・環境15
-    'cold-wave': { cards: ['dam-hydro', 'nuclear', 'oil'], optionalOn: ['oil'] }, // 出力18(冬バックアップ+5)・自給10
-    semiconductor: { cards: ['lng', 'fixed-offshore-wind', 'dam-hydro'] }, // 出力13・安全12・水力あり
-    'fuel-price-surge': { cards: ['nuclear', 'dam-hydro', 'pumped-hydro'] }, // 出力11・効率13・自給12
-    'smart-community': { cards: ['fixed-offshore-wind', 'pumped-hydro', 'small-hydro'] }, // 出力10・環境12
+    'environment-summit': { cards: ['nuclear', 'onshore-wind', 'biomass'] },
+    'cold-wave': { cards: ['dam-hydro', 'nuclear', 'oil'], optionalOn: ['oil'] },
+    semiconductor: { cards: ['lng', 'fixed-offshore-wind', 'dam-hydro'] },
+    'fuel-price-surge': { cards: ['nuclear', 'dam-hydro', 'pumped-hydro'] },
+    'smart-community': { cards: ['fixed-offshore-wind', 'pumped-hydro', 'small-hydro'] },
   };
 
   for (const m of MISSION_CARDS) {
-    it(`「${m.title}」はクリア可能な組み合わせがある`, () => {
+    it(`「${m.title}」は完全クリア可能な組み合わせがある`, () => {
       const combo = winningCombos[m.id];
       expect(combo).toBeDefined();
       const [r] = judgeMatch(
         m,
-        event('sealane-blockade'), // 発電量を直接減らさないイベント下で確認
+        event('sealane-blockade'),
         [entry('A', combo.cards, combo.optionalOn ?? [])],
         PLANT_CARDS,
       );
-      expect(r.missedReasons).toEqual([]);
+      expect(r.conditionStatus.every((c) => c.ok)).toBe(true);
       expect(r.cleared).toBe(true);
     });
   }
 });
 
-describe('1対1の勝敗', () => {
-  it('両者クリア → 効率性の高い方が勝ち（3pt/1pt）', () => {
+describe('ポーカー風スコアと勝敗', () => {
+  it('スコアが高い方が勝ち（提出3枚）', () => {
     const results = judgeMatch(
-      mission('smart-community'), // 出力10・環境12、大規模出禁
+      mission('environment-summit'),
       event('sealane-blockade'),
       [
-        entry('A', ['mega-solar', 'geothermal', 'small-hydro']), // 出力3+3+2=8 → 未達成
-        entry('B', ['fixed-offshore-wind', 'pumped-hydro', 'small-hydro']), // 出力5+3+2=10 環境2+5+5=12 クリア
+        entry('A', ['nuclear', 'onshore-wind', 'biomass']), // 高環境
+        entry('B', ['lng', 'waste', 'cogen']), // 低環境
       ],
       PLANT_CARDS,
     );
     const a = results.find((r) => r.seat === 'A')!;
     const b = results.find((r) => r.seat === 'B')!;
-    expect(a.cleared).toBe(false);
-    expect(b.cleared).toBe(true);
-    expect(b.winner).toBe(true);
-    expect(b.points).toBe(3);
-    expect(a.points).toBe(0);
+    expect(a.score).toBeGreaterThan(b.score);
+    expect(a.winner).toBe(true);
+    expect(a.points).toBe(3);
+    expect(b.points).toBe(1);
   });
 
-  it('両者クリアで効率性同点なら安全性で比較、それも同点なら引き分け（2pt/2pt）', () => {
+  it('同スコアなら引き分け（2pt/2pt）', () => {
     const results = judgeMatch(
       mission('smart-community'),
       event('sealane-blockade'),
@@ -359,19 +358,29 @@ describe('1対1の勝敗', () => {
       PLANT_CARDS,
     );
     expect(results[0].draw).toBe(true);
-    expect(results[1].draw).toBe(true);
     expect(results[0].points).toBe(2);
     expect(results[1].points).toBe(2);
   });
 
-  it('カード未提出のプレイヤーはクリア扱いにならない', () => {
+  it('未提出のプレイヤーはスコア0で、提出した側の勝ち', () => {
     const results = judgeMatch(
       mission('smart-community'),
       event('sealane-blockade'),
       [entry('A', []), entry('B', ['fixed-offshore-wind', 'pumped-hydro', 'small-hydro'])],
       PLANT_CARDS,
     );
-    expect(results[0].cleared).toBe(false);
+    expect(results[0].score).toBe(0);
     expect(results[1].winner).toBe(true);
   });
+
+  it('同カテゴリ3枚でフラッシュボーナスがつく', () => {
+    const [r] = judgeMatch(
+      mission('smart-community'),
+      event('sealane-blockade'),
+      [entry('A', ['mega-solar', 'onshore-wind', 'small-hydro'])], // すべて再生可能
+      PLANT_CARDS,
+    );
+    expect(r.breakdown.some((b) => b.label.includes('フラッシュ'))).toBe(true);
+  });
 });
+

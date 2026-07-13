@@ -1,12 +1,12 @@
-// 「発電王」判定エンジン（1対1対戦用）
+// 「発電王」判定エンジン（1対1対戦・ポーカー風）
+// 手札6枚からベスト3枚を出し、ミッションを「どれだけ攻略できたか」をスコア化して勝敗を決める。
 // 計算パイプライン:
 //   素のステータス
 //   → ミッション特別ルール（太陽光-2 など）
 //   → イベント効果（停止・ペナルティ・ブースト）
 //   → カード特殊効果（【バックアップ】等）
 //   → プレイヤー全体ペナルティ（送電網など）
-//   → 合計 → クリア条件（複数）＋必須カード条件 → 勝敗
-// 勝敗のタイブレークは「効率性合計 → 安全性合計」の順（確定ルール）。
+//   → 合計 → スコア化（指標の合計＋条件ボーナス＋コンボ）→ 高得点が勝ち
 
 import type {
   CardResult,
@@ -14,6 +14,7 @@ import type {
   MissionCard,
   PlantCard,
   PlayerResult,
+  ScoreBreakdown,
   Seat,
   StatKey,
   Stats,
@@ -219,30 +220,71 @@ export function judgeMatch(
       }
     }
 
-    const missedReasons: string[] = [];
+    // ---- スコア計算（ポーカー風「どれだけ攻略できたか」） ----
+    const breakdown: ScoreBreakdown[] = [];
+    const played = calcs.length > 0;
 
-    // 出禁カードのチェック（提出時にも弾くが、念のため判定でも失格扱いにする）
-    const bannedUsed = calcs.filter((c) => isBanned(c.card, mission));
-    for (const b of bannedUsed) {
-      missedReasons.push(`「${b.card.name}」はこのミッションでは場に出せない（ルール違反）`);
+    // ① ミッションが評価する指標の合計（重み付き）
+    for (const s of mission.scoreStats) {
+      const raw = totals[s.stat];
+      const value = raw * s.weight;
+      breakdown.push({
+        label:
+          s.weight === 1
+            ? `${STAT_LABELS[s.stat]}の合計`
+            : `${STAT_LABELS[s.stat]}の合計 ×${s.weight}`,
+        value,
+      });
     }
 
-    // 必須カード条件（例: 半導体工場は系統安定orベースロード電源が1枚以上）
-    if (mission.requireOneOf && calcs.length > 0) {
-      const has = calcs.some((c) =>
+    // ② 各条件の達成状況（満たすごとにボーナス、全部満たすと完全クリア）
+    const conditionStatus: { label: string; ok: boolean }[] = [];
+    let metCount = 0;
+    for (const cond of mission.conditions) {
+      const ok = totals[cond.stat] >= cond.min;
+      if (ok) metCount++;
+      conditionStatus.push({
+        label: `${STAT_LABELS[cond.stat]} ${cond.min}以上（現在 ${totals[cond.stat]}）`,
+        ok,
+      });
+    }
+    if (metCount > 0) {
+      breakdown.push({ label: `条件達成ボーナス（${metCount}個）`, value: metCount * 3 });
+    }
+
+    // ③ 必須カード条件（満たすとボーナス、無いと減点）
+    let requireOk = true;
+    if (mission.requireOneOf && played) {
+      requireOk = calcs.some((c) =>
         mission.requireOneOf!.tags.some((t) => c.card.tags.includes(t)),
       );
-      if (!has) missedReasons.push(`条件未達成: ${mission.requireOneOf.label}`);
+      conditionStatus.push({ label: mission.requireOneOf.label, ok: requireOk });
+      breakdown.push({
+        label: requireOk ? '必須カード条件クリア' : '必須カードなし（減点）',
+        value: requireOk ? 3 : -5,
+      });
     }
 
-    // クリア条件（複数）
-    for (const cond of mission.conditions) {
-      if (totals[cond.stat] < cond.min) {
-        missedReasons.push(
-          `${STAT_LABELS[cond.stat]}が${cond.min - totals[cond.stat]}足りない（${totals[cond.stat]}/${cond.min}）`,
-        );
+    // ④ ポーカー風のコンボボーナス
+    if (played) {
+      const cats = new Set(calcs.map((c) => c.card.category));
+      if (calcs.length === 3 && cats.size === 1) {
+        breakdown.push({ label: '同カテゴリ3枚そろい（フラッシュ）', value: 4 });
+      } else if (calcs.length === 3 && cats.size === 3) {
+        breakdown.push({ label: '3種のカテゴリ（多様性ボーナス）', value: 3 });
       }
     }
+
+    // ⑤ 出禁カードを使っていたら大きく減点
+    const bannedUsed = calcs.filter((c) => isBanned(c.card, mission));
+    for (const b of bannedUsed) {
+      breakdown.push({ label: `「${b.card.name}」は出禁カード（大幅減点）`, value: -10 });
+    }
+
+    const score = played ? breakdown.reduce((sum, b) => sum + b.value, 0) : 0;
+    const cleared = played && metCount === mission.conditions.length && requireOk && bannedUsed.length === 0;
+    if (cleared) breakdown.push({ label: '🎉 完全クリアボーナス', value: 5 });
+    const finalScore = cleared ? score + 5 : score;
 
     return {
       seat: entry.seat,
@@ -250,8 +292,10 @@ export function judgeMatch(
       cards,
       totals,
       teamNotes,
-      cleared: missedReasons.length === 0 && calcs.length > 0,
-      missedReasons,
+      score: Math.max(0, finalScore),
+      breakdown,
+      cleared,
+      conditionStatus,
       winner: false,
       draw: false,
       points: 0,
@@ -262,39 +306,48 @@ export function judgeMatch(
   return results;
 }
 
-/** 1対1の勝敗・ポイントを書き込む
- *  両者クリア → 効率性合計→安全性合計のタイブレークで勝者決定（同点なら引き分け）
- *  片方クリア → クリアした方の勝ち
- *  ポイント: 勝ち3pt / 引き分け2pt / クリアしたが負け1pt / 未達成0pt */
+/** 1対1の勝敗・勝ち点を書き込む
+ *  スコアが高い方が勝ち。同点なら引き分け。
+ *  勝ち点: 勝ち3pt / 引き分け2pt / 負け1pt（提出していれば） / 未提出0pt */
 export function decideWinner(results: PlayerResult[]): void {
-  const cleared = results.filter((r) => r.cleared);
+  const played = results.filter((r) => r.cards.length > 0);
+  if (played.length === 0) return;
 
-  if (cleared.length === 1) {
-    cleared[0].winner = true;
-    cleared[0].points = 3;
-  } else if (cleared.length >= 2) {
-    const [a, b] = cleared;
-    const diff =
-      a.totals.efficiency - b.totals.efficiency || a.totals.safety - b.totals.safety;
-    if (diff === 0) {
-      a.draw = b.draw = true;
-      a.points = b.points = 2;
-    } else {
-      const win = diff > 0 ? a : b;
-      const lose = diff > 0 ? b : a;
-      win.winner = true;
-      win.points = 3;
-      lose.points = 1;
-    }
+  if (played.length === 1) {
+    played[0].winner = true;
+    played[0].points = 3;
+    return;
+  }
+
+  const [a, b] = played;
+  if (a.score === b.score) {
+    a.draw = b.draw = true;
+    a.points = b.points = 2;
+  } else {
+    const win = a.score > b.score ? a : b;
+    const lose = a.score > b.score ? b : a;
+    win.winner = true;
+    win.points = 3;
+    lose.points = 1;
   }
 }
 
-/** ミッションの条件を人が読める形にする（画面表示用） */
+/** ミッションのスコア対象を人が読める形にする（画面表示用） */
+export function missionScoreText(mission: MissionCard): string {
+  return mission.scoreStats
+    .map((s) =>
+      s.weight === 1 ? STAT_LABELS[s.stat] : `${STAT_LABELS[s.stat]}（×${s.weight}）`,
+    )
+    .join('＋');
+}
+
+/** ミッションの目標条件（達成でボーナス）を人が読める形にする（画面表示用） */
 export function missionConditionText(mission: MissionCard): string {
+  if (mission.conditions.length === 0) return '（目標条件なし・スコアを稼ごう）';
   return mission.conditions
     .map((c) =>
       c.stat === 'output'
-        ? `目標発電量 ${c.min} 以上`
+        ? `発電量 ${c.min} 以上`
         : `${STAT_LABELS[c.stat]}の合計 ${c.min} 以上`,
     )
     .join('、');

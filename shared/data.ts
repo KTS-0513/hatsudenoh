@@ -308,7 +308,10 @@ export const MISSION_CARDS: MissionCard[] = [
       '地球温暖化を防止するため、世界中で温室効果ガスの削減目標が厳しく設定された。クリーンなエネルギーへの大転換が求められている！',
     lesson:
       '再エネだけで電力を賄おうとすると、発電量の確保やコストの折り合いが難しくなる「トレードオフ」を体験します。',
-    // 目標値は3枚上限で達成可能な水準に調整済み（原案: 発電量12・環境15）
+    scoreStats: [
+      { stat: 'environment', weight: 2 }, // 環境を重視して採点
+      { stat: 'output', weight: 1 },
+    ],
     conditions: [
       { stat: 'output', min: 10 },
       { stat: 'environment', min: 13 },
@@ -325,10 +328,12 @@ export const MISSION_CARDS: MissionCard[] = [
       '数十年に一度の大寒波が日本列島を襲い、暖房のための電力需要が爆発的に増加。安定した大電力を供給しつつ、燃料切れによるブラックアウトを防げ！',
     lesson:
       '再エネが機能しにくい極限状態において、24時間安定して大出力を出せる電源やバックアップ技術の重要性を理解します。',
-    // 目標値は3枚上限で達成可能な水準に調整済み（原案: 発電量25）
-    // 発電量18は石油の【バックアップ】(冬+5)を使わないとほぼ届かない設計＝バックアップの大切さを学ぶ
+    scoreStats: [
+      { stat: 'output', weight: 2 }, // 大電力が最優先
+      { stat: 'selfSufficiency', weight: 1 },
+    ],
     conditions: [
-      { stat: 'output', min: 18 },
+      { stat: 'output', min: 16 },
       { stat: 'selfSufficiency', min: 8 },
     ],
     statAdjust: {
@@ -346,7 +351,10 @@ export const MISSION_CARDS: MissionCard[] = [
       '地域に世界最新鋭の半導体工場が建設された。半導体製造には、1秒の停電や電圧低下も許されない「完璧に安定した電気」が大量に必要だ！',
     lesson:
       'ただ発電するだけでなく、電気の「質（安定性・周波数の維持）」を担保する調整技術が必要不可欠であることを学びます。',
-    // 目標値は3枚上限で達成可能な水準に調整済み（原案: 発電量18）
+    scoreStats: [
+      { stat: 'safety', weight: 2 }, // 停電を許さない＝安全性重視
+      { stat: 'output', weight: 1 },
+    ],
     conditions: [
       { stat: 'output', min: 11 },
       { stat: 'safety', min: 12 },
@@ -364,8 +372,11 @@ export const MISSION_CARDS: MissionCard[] = [
       '世界情勢の悪化により、輸入している石炭、石油、LNGの価格がトリプル高騰！家計や工場の電気代を抑えるため、国産エネルギーと低コストの発電方法を選択せよ！',
     lesson:
       '日本の「エネルギー自給率の低さ（約12%）」が、世界情勢によって人々の経済生活（電気代）に直接大打撃を与えるリスクを学びます。',
-    // 目標値は3枚上限で達成可能な水準に調整済み（原案: 発電量15・効率14・自給12）
-    // 自給率10は輸入燃料系(石炭・石油・LNG)に頼ると届かない設計＝ミッションのテーマどおり
+    scoreStats: [
+      { stat: 'efficiency', weight: 1 },
+      { stat: 'selfSufficiency', weight: 1 },
+      { stat: 'output', weight: 1 },
+    ],
     conditions: [
       { stat: 'output', min: 10 },
       { stat: 'efficiency', min: 11 },
@@ -379,6 +390,11 @@ export const MISSION_CARDS: MissionCard[] = [
       '巨大な発電所に頼るのではなく、地域にある資源（温泉、ゴミ、森林、川の流れなど）を活用し、災害に強くて自立した「エコタウン」を構築せよ！',
     lesson:
       '大規模集中型発電のメリット（大出力）と、分散型エネルギーシステム（災害時の強さ、地域資源の有効利用）のメリットを比較・評価します。',
+    scoreStats: [
+      { stat: 'environment', weight: 1 },
+      { stat: 'selfSufficiency', weight: 1 },
+      { stat: 'output', weight: 1 },
+    ],
     conditions: [
       { stat: 'output', min: 10 },
       { stat: 'environment', min: 12 },

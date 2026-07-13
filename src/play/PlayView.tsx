@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { PLANT_CARDS } from '../../shared/data';
 import { hasOptionalEffect, isBanned } from '../../shared/engine';
-import type { MatchState, Seat } from '../../shared/types';
-import { socket, useGameState, useServerError } from '../socket';
+import type { MatchState, PlantCard, Seat } from '../../shared/types';
+import { socket, useGameState, useHand, useServerError } from '../socket';
 import { CardChip, EventPanel, MissionPanel, ResultDetail } from '../components/shared';
 
 const STORAGE_KEY = 'hatsuden-player';
+const cardById = (id: string): PlantCard => PLANT_CARDS.find((c) => c.id === id)!;
 
 interface SavedSeat {
   matchId: number;
@@ -26,11 +27,14 @@ const loadSaved = (): SavedSeat | null => {
 
 export function PlayView() {
   const state = useGameState();
+  const hand = useHand(); // この端末のプレイヤーの手札6枚
   const error = useServerError();
   const [saved, setSaved] = useState<SavedSeat | null>(loadSaved);
   const [nameInput, setNameInput] = useState(saved?.name ?? '');
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]); // 場に出す3枚
   const [optionalOn, setOptionalOn] = useState<string[]>([]);
+  const [mulliganMode, setMulliganMode] = useState(false);
+  const [swapSel, setSwapSel] = useState<string[]>([]); // 交換するカード
 
   // 再接続・リロード時に自動で同じ席へ戻る
   useEffect(() => {
@@ -42,12 +46,14 @@ export function PlayView() {
   const match: MatchState | null =
     saved && state ? (state.matches.find((m) => m.id === saved.matchId) ?? null) : null;
 
-  // ラウンドが変わったら選択をリセット
+  // ラウンドが変わった／手札が変わったら選択をリセット
   const round = match?.round;
   useEffect(() => {
     setSelected([]);
     setOptionalOn([]);
-  }, [round, saved?.matchId]);
+    setSwapSel([]);
+    setMulliganMode(false);
+  }, [round, saved?.matchId, hand.join(',')]);
 
   if (!state) return <div className="loading">サーバーに接続中…</div>;
 
@@ -175,30 +181,80 @@ export function PlayView() {
         </div>
       )}
 
-      {match.phase === 'play' && bothRevealed && !me.submission && (
+      {match.phase === 'play' && bothRevealed && !me.submission && mulliganMode && (
         <div className="picker">
-          <div className="panel-title">場に出すカードを選ぼう（{selected.length} / 3枚）</div>
-          <div className="card-grid">
-            {PLANT_CARDS.map((c) => {
+          <div className="panel-title">
+            交換するカードを選ぼう（{swapSel.length} / 最大4枚）
+          </div>
+          <p className="hint">選んだカードが山札のカードと入れ替わります（1回だけ）</p>
+          <div className="hand-grid">
+            {hand.map((id) => {
+              const c = cardById(id);
+              return (
+                <CardChip
+                  key={id}
+                  card={c}
+                  selected={swapSel.includes(id)}
+                  onClick={() =>
+                    setSwapSel((prev) =>
+                      prev.includes(id)
+                        ? prev.filter((x) => x !== id)
+                        : prev.length >= 4
+                          ? prev
+                          : [...prev, id],
+                    )
+                  }
+                />
+              );
+            })}
+          </div>
+          <div className="button-row">
+            <button
+              className="btn primary big"
+              disabled={swapSel.length === 0}
+              onClick={() => socket.emit('player:mulligan', swapSel)}
+            >
+              選んだ{swapSel.length}枚を交換する
+            </button>
+            <button className="btn" onClick={() => { setMulliganMode(false); setSwapSel([]); }}>
+              やめる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {match.phase === 'play' && bothRevealed && !me.submission && !mulliganMode && (
+        <div className="picker">
+          <div className="panel-title">
+            手札からベスト3枚を選ぼう（{selected.length} / 3枚）
+          </div>
+          {!me.mulliganUsed && (
+            <button className="btn mulligan" onClick={() => setMulliganMode(true)}>
+              🔄 手札を交換する（1回だけ・最大4枚）
+            </button>
+          )}
+          <div className="hand-grid">
+            {hand.map((id) => {
+              const c = cardById(id);
               const banned = isBanned(c, match.mission);
               return (
                 <CardChip
-                  key={c.id}
+                  key={id}
                   card={c}
-                  selected={selected.includes(c.id)}
+                  selected={selected.includes(id)}
                   disabled={banned}
                   disabledReason="このミッションでは出せない"
-                  onClick={() => toggleCard(c.id)}
+                  onClick={() => toggleCard(id)}
                 />
               );
             })}
           </div>
 
-          {selected.some((id) => hasOptionalEffect(PLANT_CARDS.find((c) => c.id === id)!)) && (
+          {selected.some((id) => hasOptionalEffect(cardById(id))) && (
             <div className="optional-effects">
               <div className="panel-title">特殊効果を使う？（【バックアップ】など）</div>
               {selected
-                .map((id) => PLANT_CARDS.find((c) => c.id === id)!)
+                .map(cardById)
                 .filter(hasOptionalEffect)
                 .map((c) => (
                   <label key={c.id} className="optional-toggle">

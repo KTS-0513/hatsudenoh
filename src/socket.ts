@@ -17,6 +17,18 @@ export function useGameState(): GameState | null {
   return state;
 }
 
+/** この端末のプレイヤーだけに配られる手札を購読するフック */
+export function useHand(): string[] {
+  const [hand, setHand] = useState<string[]>([]);
+  useEffect(() => {
+    socket.on('hand', setHand);
+    return () => {
+      socket.off('hand', setHand);
+    };
+  }, []);
+  return hand;
+}
+
 /** サーバーからのエラーメッセージを一定時間表示するフック */
 export function useServerError(): string | null {
   const [msg, setMsg] = useState<string | null>(null);

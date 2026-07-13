@@ -1,5 +1,6 @@
 // プレイヤー画面・教員モニターで共用する表示部品
 
+import { useState } from 'react';
 import type {
   EventCard,
   MissionCard,
@@ -8,7 +9,7 @@ import type {
   Stats,
 } from '../../shared/types';
 import { STAT_KEYS, STAT_LABELS } from '../../shared/types';
-import { missionConditionText, missionSpecialRules } from '../../shared/engine';
+import { missionConditionText, missionScoreText, missionSpecialRules } from '../../shared/engine';
 
 const CATEGORY_CLASS: Record<string, string> = {
   系統安定: 'cat-grid',
@@ -18,6 +19,22 @@ const CATEGORY_CLASS: Record<string, string> = {
   化石燃料: 'cat-oil',
   熱利用: 'cat-heat',
 };
+
+/** カード画像。/cards/<id>.jpg があればそれを表示、無ければステータス表示にフォールバック */
+function CardImage({ card }: { card: PlantCard }) {
+  const [failed, setFailed] = useState(false);
+  const src = card.image ?? `/cards/${card.id}.jpg`;
+  if (failed) return null;
+  return (
+    <img
+      className="card-image"
+      src={src}
+      alt={card.name}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function StatRow({ stats }: { stats: Stats }) {
   return (
@@ -52,6 +69,7 @@ export function CardChip({
       disabled={disabled}
       type="button"
     >
+      <CardImage card={card} />
       <div className="card-chip-head">
         <span className="card-category">{card.category}</span>
         <span className="card-name">{card.name}</span>
@@ -76,7 +94,8 @@ export function MissionPanel({ mission }: { mission: MissionCard | null }) {
         <>
           <div className="panel-card-title">{mission.title}</div>
           <div className="panel-flavor">{mission.flavor}</div>
-          <div className="panel-condition">クリア条件: {missionConditionText(mission)}</div>
+          <div className="panel-condition">スコア: {missionScoreText(mission)} を高くしよう</div>
+          <div className="panel-subcondition">完全クリア条件: {missionConditionText(mission)}</div>
           {missionSpecialRules(mission).map((r, i) => (
             <div key={i} className="panel-special">
               ⚠ {r}
@@ -115,19 +134,40 @@ export function ResultDetail({
   mission: MissionCard;
 }) {
   return (
-    <div className={`result-detail ${result.cleared ? 'cleared' : 'missed'}`}>
+    <div className={`result-detail ${result.winner ? 'cleared' : 'missed'}`}>
       <div className="result-head">
         <span className="result-group">{result.playerName}</span>
+        <span className="result-score">スコア {result.score}</span>
         {result.winner && <span className="result-badge win">🏆 勝ち（+{result.points}pt）</span>}
         {result.draw && <span className="result-badge draw">引き分け（+{result.points}pt）</span>}
-        {result.cleared ? (
-          <span className="result-badge ok">
-            クリア{!result.winner && !result.draw && `（+${result.points}pt）`}
-          </span>
-        ) : (
-          <span className="result-badge ng">未達成</span>
-        )}
+        {result.cleared && <span className="result-badge ok">🎉 完全クリア</span>}
       </div>
+
+      {result.breakdown.length > 0 && (
+        <div className="score-breakdown">
+          {result.breakdown.map((b, i) => (
+            <div key={i} className={`score-line-item ${b.value < 0 ? 'minus' : ''}`}>
+              <span>{b.label}</span>
+              <span>{b.value >= 0 ? `+${b.value}` : b.value}</span>
+            </div>
+          ))}
+          <div className="score-line-item total">
+            <span>合計スコア</span>
+            <span>{result.score}</span>
+          </div>
+        </div>
+      )}
+
+      {result.conditionStatus.length > 0 && (
+        <div className="condition-status">
+          {result.conditionStatus.map((c, i) => (
+            <div key={i} className={c.ok ? 'ok' : 'ng'}>
+              {c.ok ? '✅' : '▲'} {c.label}
+            </div>
+          ))}
+        </div>
+      )}
+
       {result.cards.length === 0 ? (
         <div className="panel-empty">カードが提出されていません</div>
       ) : (
@@ -178,14 +218,7 @@ export function ResultDetail({
           ※ {n}
         </div>
       ))}
-      {!result.cleared && result.cards.length > 0 && result.missedReasons.length > 0 && (
-        <div className="missed-reasons">
-          {result.missedReasons.map((r, i) => (
-            <div key={i}>▲ {r}</div>
-          ))}
-        </div>
-      )}
-      <div className="result-condition">条件: {missionConditionText(mission)}</div>
+      <div className="result-condition">スコア対象: {missionScoreText(mission)}</div>
     </div>
   );
 }
