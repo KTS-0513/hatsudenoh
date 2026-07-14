@@ -211,6 +211,7 @@ export interface GameState {
 // ---- Socket.io イベント ----
 
 export interface ClientToServer {
+  sync: () => void; // 接続直後などに現在の状態を送り直してもらう（取りこぼし防止）
   'host:setup': (opts: { matchCount: number; totalRounds: number; withEvents: boolean }) => void;
   'host:reset': () => void;
   'player:join': (opts: { matchId: number; seat: Seat; name?: string }) => void;

@@ -230,6 +230,16 @@ io.on('connection', (socket) => {
     };
   };
 
+  // 接続直後などに、現在の状態（＋その席の手札）を送り直す（取りこぼし防止）
+  socket.on('sync', () => {
+    socket.emit('state', full.state);
+    const s = seats.get(socket.id);
+    if (s) {
+      const internal = internalOf(s.matchId);
+      socket.emit('hand', internal ? internal.hands[s.seat] : []);
+    }
+  });
+
   // ---- 教員（モニター）操作 ----
   socket.on('host:setup', ({ matchCount, totalRounds, withEvents }) => {
     const n = Math.max(1, Math.min(MAX_MATCHES, Math.floor(matchCount)));

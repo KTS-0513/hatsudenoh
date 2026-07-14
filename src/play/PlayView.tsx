@@ -5,7 +5,7 @@ import { PLANT_CARDS } from '../../shared/data';
 import { hasOptionalEffect } from '../../shared/engine';
 import type { MatchState, PlantCard, Seat } from '../../shared/types';
 import { socket, useGameState, useHand, useServerError } from '../socket';
-import { CardChip, EventPanel, MissionPanel, ResultDetail } from '../components/shared';
+import { CardBack, CardChip, EventPanel, MissionPanel, ResultDetail } from '../components/shared';
 import { HowToPlay } from '../HowToPlay';
 
 const STORAGE_KEY = 'hatsuden-player';
@@ -173,6 +173,25 @@ export function PlayView() {
         <div className={state.withEvents ? 'panels' : 'panels single'}>
           <MissionPanel mission={match.mission} />
           {state.withEvents && <EventPanel event={match.event} />}
+        </div>
+      )}
+
+      {match.phase === 'play' && (
+        <div className="table-info">
+          <div className="opp-hand">
+            <span className="table-label">{opponent.name}の手札</span>
+            <span className="back-row">
+              {Array.from({ length: opponent.handSize }).map((_, i) => (
+                <CardBack key={i} small />
+              ))}
+              {opponent.handSize === 0 && <span className="hint">（待機中）</span>}
+            </span>
+          </div>
+          <div className="deck-info">
+            <span className="table-label">山札</span>
+            <CardBack small />
+            <span className="deck-count">{match.deckLeft}</span>
+          </div>
         </div>
       )}
 

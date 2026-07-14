@@ -36,6 +36,29 @@ function CardImage({ card }: { card: PlantCard }) {
   );
 }
 
+/** カードの裏面。public/card-back.png があれば表示、無ければ模様のフォールバック */
+export function CardBack({ small }: { small?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span className={`card-back fallback ${small ? 'small' : ''}`} />;
+  return (
+    <img
+      className={`card-back ${small ? 'small' : ''}`}
+      src="/card-back.png"
+      alt="カード（裏）"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+/** トップ画面などで使うロゴ画像（card-back.png を流用）。無ければ何も出さない */
+export function LogoImage() {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <img className="logo-image" src="/card-back.png" alt="発電王" onError={() => setFailed(true)} />
+  );
+}
+
 export function StatRow({ stats }: { stats: Stats }) {
   return (
     <div className="stat-row">
