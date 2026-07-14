@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { EVENT_CARDS, MISSION_CARDS, PLANT_CARDS } from '../shared/data';
-import { isBanned, judgeMatch } from '../shared/engine';
+import { judgeMatch } from '../shared/engine';
 import type {
   ClientToServer,
   EventCard,
@@ -83,11 +83,12 @@ const newInternal = (): MatchInternal => ({
   hands: { A: [], B: [] },
 });
 
-const freshState = (matchCount = MAX_MATCHES, totalRounds = 3): FullState => ({
+const freshState = (matchCount = MAX_MATCHES, totalRounds = 3, withEvents = true): FullState => ({
   state: {
     started: false,
     matchCount,
     totalRounds,
+    withEvents,
     matches: Array.from({ length: matchCount }, (_, i) => newMatch(i + 1)),
   },
   internals: Array.from({ length: matchCount }, newInternal),
@@ -195,7 +196,7 @@ function broadcast(): void {
 }
 
 function runJudge(match: MatchState): void {
-  if (!match.mission || !match.event) return;
+  if (!match.mission) return; // イベントはやさしいモードでは無い（nullでOK）
   const entries = match.players.map((p) => ({
     seat: p.seat,
     playerName: p.name,
@@ -206,7 +207,6 @@ function runJudge(match: MatchState): void {
   for (const r of results) {
     const p = match.players.find((p) => p.seat === r.seat)!;
     p.score += r.points;
-    if (r.cleared) p.clears += 1;
     if (r.winner) p.wins += 1;
   }
   match.results = results;
@@ -231,17 +231,17 @@ io.on('connection', (socket) => {
   };
 
   // ---- 教員（モニター）操作 ----
-  socket.on('host:setup', ({ matchCount, totalRounds }) => {
+  socket.on('host:setup', ({ matchCount, totalRounds, withEvents }) => {
     const n = Math.max(1, Math.min(MAX_MATCHES, Math.floor(matchCount)));
     const rounds = Math.max(1, Math.min(5, Math.floor(totalRounds)));
-    full = freshState(n, rounds);
+    full = freshState(n, rounds, withEvents);
     full.state.started = true;
     seats.clear();
     broadcast();
   });
 
   socket.on('host:reset', () => {
-    full = freshState(full.state.matchCount, full.state.totalRounds);
+    full = freshState(full.state.matchCount, full.state.totalRounds, full.state.withEvents);
     seats.clear();
     broadcast();
   });
@@ -282,6 +282,7 @@ io.on('connection', (socket) => {
       if (!id) return fail('ミッションの山札が空です');
       c.match.mission = MISSION_CARDS.find((m) => m.id === id) as MissionCard;
     } else {
+      if (!full.state.withEvents) return; // やさしいモードはイベントなし
       if (c.match.event) return;
       const id = drawRandom(c.internal.eventDeck);
       if (!id) return fail('イベントの山札が空です');
@@ -322,16 +323,13 @@ io.on('connection', (socket) => {
     const c = ctx();
     if (!c) return fail('先に対戦に参加してください');
     if (c.match.phase !== 'play') return fail('今は提出できません');
-    if (!c.match.mission || !c.match.event) return fail('先にミッションとイベントをめくってください');
+    if (!c.match.mission) return fail('先にミッションをめくってください');
+    if (full.state.withEvents && !c.match.event) return fail('先にイベントもめくってください');
 
     const hand = c.internal.hands[c.seat];
     const unique = [...new Set(cardIds)].filter((id) => hand.includes(id));
     if (unique.length === 0) return fail('手札からカードを選んでください');
     if (unique.length > PLAY_SIZE) return fail(`場に出せるのは最大${PLAY_SIZE}枚までです`);
-    const banned = unique
-      .map((id) => PLANT_CARDS.find((cc) => cc.id === id)!)
-      .find((cc) => isBanned(cc, c.match.mission));
-    if (banned) return fail(`「${banned.name}」はこのミッションでは場に出せません`);
 
     c.me.submission = {
       cardIds: unique,

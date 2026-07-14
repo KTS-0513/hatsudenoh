@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { PLANT_CARDS } from '../../shared/data';
-import { hasOptionalEffect, isBanned } from '../../shared/engine';
+import { hasOptionalEffect } from '../../shared/engine';
 import type { MatchState, PlantCard, Seat } from '../../shared/types';
 import { socket, useGameState, useHand, useServerError } from '../socket';
 import { CardChip, EventPanel, MissionPanel, ResultDetail } from '../components/shared';
+import { HowToPlay } from '../HowToPlay';
 
 const STORAGE_KEY = 'hatsuden-player';
 const cardById = (id: string): PlantCard => PLANT_CARDS.find((c) => c.id === id)!;
@@ -35,6 +36,7 @@ export function PlayView() {
   const [optionalOn, setOptionalOn] = useState<string[]>([]);
   const [mulliganMode, setMulliganMode] = useState(false);
   const [swapSel, setSwapSel] = useState<string[]>([]); // 交換するカード
+  const [showHelp, setShowHelp] = useState(false);
 
   // 再接続・リロード時に自動で同じ席へ戻る
   useEffect(() => {
@@ -70,9 +72,13 @@ export function PlayView() {
   if (!saved || !match) {
     return (
       <div className="join-screen">
+        {showHelp && <HowToPlay onClose={() => setShowHelp(false)} />}
         <h1 className="app-title">発電王</h1>
         {error && <div className="toast">{error}</div>}
         <p>名前を入れて、あいている席を選んでね</p>
+        <button className="btn" onClick={() => setShowHelp(true)}>
+          📖 あそびかたを見る
+        </button>
         <input
           className="name-input"
           placeholder="なまえ（省略OK）"
@@ -114,7 +120,8 @@ export function PlayView() {
 
   const me = match.players.find((p) => p.seat === saved.seat)!;
   const opponent = match.players.find((p) => p.seat !== saved.seat)!;
-  const bothRevealed = !!match.mission && !!match.event;
+  // やさしいモードはイベント不要。ふつうモードはミッション＋イベント両方めくれたら準備完了
+  const ready = !!match.mission && (!state.withEvents || !!match.event);
 
   const toggleCard = (id: string) => {
     setSelected((prev) => {
@@ -138,6 +145,7 @@ export function PlayView() {
   return (
     <div className="play">
       {error && <div className="toast">{error}</div>}
+      {showHelp && <HowToPlay onClose={() => setShowHelp(false)} />}
       <header className="group-header">
         <span className="group-name">
           対戦{match.id}　{me.name} <span className="vs">vs</span> {opponent.name}
@@ -146,6 +154,9 @@ export function PlayView() {
         <span className="round-indicator">
           ラウンド {Math.max(match.round, 1)} / {state.totalRounds}
         </span>
+        <button className="btn tiny" onClick={() => setShowHelp(true)}>
+          📖 あそびかた
+        </button>
         <button className="btn tiny" onClick={leaveSeat}>
           席をはなれる
         </button>
@@ -159,20 +170,20 @@ export function PlayView() {
       )}
 
       {match.phase !== 'waiting' && (
-        <div className="panels">
+        <div className={state.withEvents ? 'panels' : 'panels single'}>
           <MissionPanel mission={match.mission} />
-          <EventPanel event={match.event} />
+          {state.withEvents && <EventPanel event={match.event} />}
         </div>
       )}
 
-      {match.phase === 'play' && !bothRevealed && (
+      {match.phase === 'play' && !ready && (
         <div className="reveal-actions">
           {!match.mission && (
             <button className="btn primary big" onClick={() => socket.emit('player:reveal', 'mission')}>
               ミッションをめくる（残り{match.missionDeckLeft}）
             </button>
           )}
-          {match.mission && !match.event && (
+          {state.withEvents && match.mission && !match.event && (
             <button className="btn primary big" onClick={() => socket.emit('player:reveal', 'event')}>
               イベントをめくる（残り{match.eventDeckLeft}）
             </button>
@@ -181,7 +192,7 @@ export function PlayView() {
         </div>
       )}
 
-      {match.phase === 'play' && bothRevealed && !me.submission && mulliganMode && (
+      {match.phase === 'play' && ready && !me.submission && mulliganMode && (
         <div className="picker">
           <div className="panel-title">
             交換するカードを選ぼう（{swapSel.length} / 最大4枚）
@@ -223,7 +234,7 @@ export function PlayView() {
         </div>
       )}
 
-      {match.phase === 'play' && bothRevealed && !me.submission && !mulliganMode && (
+      {match.phase === 'play' && ready && !me.submission && !mulliganMode && (
         <div className="picker">
           <div className="panel-title">
             手札からベスト3枚を選ぼう（{selected.length} / 3枚）
@@ -236,14 +247,11 @@ export function PlayView() {
           <div className="hand-grid">
             {hand.map((id) => {
               const c = cardById(id);
-              const banned = isBanned(c, match.mission);
               return (
                 <CardChip
                   key={id}
                   card={c}
                   selected={selected.includes(id)}
-                  disabled={banned}
-                  disabledReason="このミッションでは出せない"
                   onClick={() => toggleCard(id)}
                 />
               );
@@ -325,17 +333,14 @@ export function PlayView() {
             {myResult.winner && '🏆 このラウンドはあなたの勝ち！'}
             {oppResult.winner && `このラウンドは${opponent.name}の勝ち`}
             {myResult.draw && '引き分け！'}
-            {!myResult.winner && !oppResult.winner && !myResult.draw && '両者ミッション未達成…'}
           </div>
           <ResultDetail result={myResult} mission={match.mission} />
           <ResultDetail result={oppResult} mission={match.mission} />
-          {match.event?.lesson && (
-            <div className="lesson">
-              <b>💡 学びのポイント</b>
-              <p>{match.mission.lesson}</p>
-              <p>{match.event.lesson}</p>
-            </div>
-          )}
+          <div className="reflect">
+            <b>🤔 考えてみよう（答えはみんなで話そう）</b>
+            <p className="reflect-q">{match.mission.question}</p>
+            {match.event?.question && <p className="reflect-q">{match.event.question}</p>}
+          </div>
           <div className="score-line">
             通算: {me.name} {me.score}pt − {opponent.name} {opponent.score}pt
           </div>
@@ -351,6 +356,16 @@ export function PlayView() {
           <FinalVerdict meScore={me.score} oppScore={opponent.score} meName={me.name} oppName={opponent.name} />
           <div className="score-line">
             {me.name} {me.score}pt − {opponent.name} {opponent.score}pt
+          </div>
+          <div className="reflect">
+            <b>🤔 みんなで考えよう</b>
+            <p className="reflect-q">
+              いろんな立場の人が、それぞれちがう電気を求めていたね。
+              「これ1枚あれば全部かなう」という完ぺきな発電所は、あったかな？
+            </p>
+            <p className="reflect-q">
+              なぜ日本は、1種類ではなく<b>いろいろな発電を組み合わせて（エネルギーミックス）</b>電気をつくっているのだろう？
+            </p>
           </div>
           <p className="hint">先生の合図があるまで待っていてね</p>
         </div>

@@ -9,7 +9,7 @@ import type {
   Stats,
 } from '../../shared/types';
 import { STAT_KEYS, STAT_LABELS } from '../../shared/types';
-import { missionConditionText, missionScoreText, missionSpecialRules } from '../../shared/engine';
+import { missionSpotlightLabel } from '../../shared/engine';
 
 const CATEGORY_CLASS: Record<string, string> = {
   系統安定: 'cat-grid',
@@ -92,15 +92,13 @@ export function MissionPanel({ mission }: { mission: MissionCard | null }) {
       <div className="panel-title">ミッション（社会の要求）</div>
       {mission ? (
         <>
-          <div className="panel-card-title">{mission.title}</div>
-          <div className="panel-flavor">{mission.flavor}</div>
-          <div className="panel-condition">スコア: {missionScoreText(mission)} を高くしよう</div>
-          <div className="panel-subcondition">完全クリア条件: {missionConditionText(mission)}</div>
-          {missionSpecialRules(mission).map((r, i) => (
-            <div key={i} className="panel-special">
-              ⚠ {r}
-            </div>
-          ))}
+          <div className="panel-card-title">
+            {mission.emoji} {mission.title}
+          </div>
+          <div className="panel-flavor">「{mission.flavor}」</div>
+          <div className="spotlight-badge">
+            今回の注目：<b>{missionSpotlightLabel(mission)}</b>（この力が2倍で効く）
+          </div>
         </>
       ) : (
         <div className="panel-empty">まだめくられていません</div>
@@ -140,8 +138,11 @@ export function ResultDetail({
         <span className="result-score">スコア {result.score}</span>
         {result.winner && <span className="result-badge win">🏆 勝ち（+{result.points}pt）</span>}
         {result.draw && <span className="result-badge draw">引き分け（+{result.points}pt）</span>}
-        {result.cleared && <span className="result-badge ok">🎉 完全クリア</span>}
       </div>
+
+      {result.cards.length > 0 && (
+        <BalanceBars totals={result.totals} spotlight={mission.spotlight} />
+      )}
 
       {result.breakdown.length > 0 && (
         <div className="score-breakdown">
@@ -155,16 +156,6 @@ export function ResultDetail({
             <span>合計スコア</span>
             <span>{result.score}</span>
           </div>
-        </div>
-      )}
-
-      {result.conditionStatus.length > 0 && (
-        <div className="condition-status">
-          {result.conditionStatus.map((c, i) => (
-            <div key={i} className={c.ok ? 'ok' : 'ng'}>
-              {c.ok ? '✅' : '▲'} {c.label}
-            </div>
-          ))}
         </div>
       )}
 
@@ -218,7 +209,28 @@ export function ResultDetail({
           ※ {n}
         </div>
       ))}
-      <div className="result-condition">スコア対象: {missionScoreText(mission)}</div>
+    </div>
+  );
+}
+
+/** 出した3枚の「5つの力」を棒グラフで見える化（多面的に強み・弱みを掴む） */
+function BalanceBars({ totals, spotlight }: { totals: Stats; spotlight: keyof Stats }) {
+  const max = Math.max(1, ...STAT_KEYS.map((k) => totals[k]));
+  return (
+    <div className="balance-bars">
+      <div className="balance-title">5つの力のバランス</div>
+      {STAT_KEYS.map((k) => (
+        <div key={k} className={`balance-row ${k === spotlight ? 'spot' : ''}`}>
+          <span className="balance-label">
+            {STAT_LABELS[k]}
+            {k === spotlight && ' ★'}
+          </span>
+          <span className="balance-track">
+            <span className="balance-fill" style={{ width: `${(totals[k] / max) * 100}%` }} />
+          </span>
+          <span className="balance-num">{totals[k]}</span>
+        </div>
+      ))}
     </div>
   );
 }

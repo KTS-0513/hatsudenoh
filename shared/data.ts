@@ -125,7 +125,7 @@ export const PLANT_CARDS: PlantCard[] = [
       keyword: 'お天気依存',
       text: 'メガソーラーは天気の影響が非常に高い。もしイベントカードで天気影響が起きたら、この発電力を0にする。',
     },
-    zeroOnEvents: ['no-wind'], // カードの効果文により、長雨・台風(solarタグ)に加えて無風でも停止する
+    zeroOnEvents: ['windless'], // カードの効果文により、長雨(solarタグ)に加えて無風でも停止する
   },
   {
     id: 'onshore-wind',
@@ -298,168 +298,104 @@ export const PLANT_CARDS: PlantCard[] = [
   },
 ];
 
-// ---- ミッションカード（社会の要求・5種） ----
+// ---- ミッションカード（立場の人の「ひとこと」＋注目する力ひとつ） ----
+// むずかしい条件文はやめ、「だれが・何を求めているか」を一言で。
+// 採点は engine.ts で「注目ステータス×2 ＋ 5つの力の合計 ＋ 多様性ボーナス」。
 
 export const MISSION_CARDS: MissionCard[] = [
   {
-    id: 'environment-summit',
-    title: '国際環境サミット：脱炭素への誓い',
-    flavor:
-      '地球温暖化を防止するため、世界中で温室効果ガスの削減目標が厳しく設定された。クリーンなエネルギーへの大転換が求められている！',
-    lesson:
-      '再エネだけで電力を賄おうとすると、発電量の確保やコストの折り合いが難しくなる「トレードオフ」を体験します。',
-    scoreStats: [
-      { stat: 'environment', weight: 2 }, // 環境を重視して採点
-      { stat: 'output', weight: 1 },
-    ],
-    conditions: [
-      { stat: 'output', min: 10 },
-      { stat: 'environment', min: 13 },
-    ],
-    bannedTag: {
-      tag: 'high-co2',
-      label: '「石炭火力」「石油火力」などのCO2大量排出カードは場に出せない',
-    },
+    id: 'factory',
+    title: '工場長',
+    emoji: '🏭',
+    flavor: '新しい工場が動きだす！とにかく、たくさんの電気がほしいんだ。',
+    spotlight: 'output', // 発電量
+    question:
+      'たくさん発電できるカードは、他の力（環境・安全・自給率など）はどうだった？「電気の量」だけを追い求めると、何が犠牲になるだろう？',
+    lesson: '大きな電力を出せる電源は、環境やコストで弱点をかかえがち。「量」だけでは選べません。',
   },
   {
-    id: 'cold-wave',
-    title: '大寒波襲来：冬の電力危機',
-    flavor:
-      '数十年に一度の大寒波が日本列島を襲い、暖房のための電力需要が爆発的に増加。安定した大電力を供給しつつ、燃料切れによるブラックアウトを防げ！',
-    lesson:
-      '再エネが機能しにくい極限状態において、24時間安定して大出力を出せる電源やバックアップ技術の重要性を理解します。',
-    scoreStats: [
-      { stat: 'output', weight: 2 }, // 大電力が最優先
-      { stat: 'selfSufficiency', weight: 1 },
-    ],
-    conditions: [
-      { stat: 'output', min: 16 },
-      { stat: 'selfSufficiency', min: 8 },
-    ],
-    statAdjust: {
-      tag: 'solar',
-      stat: 'output',
-      add: -2,
-      note: '寒波の影響（悪天候・日照時間の短さ）により太陽光の発電量-2',
-    },
-    winter: true, // 石油火力の【バックアップ】が使用可能
+    id: 'environment',
+    title: '環境団体',
+    emoji: '🌳',
+    flavor: '地球のために、CO₂の少ないクリーンな電気にしていきましょう。',
+    spotlight: 'environment', // 環境
+    question:
+      '環境にやさしいカードを集めたとき、発電量やコストはどうなった？「地球を守ること」と「たくさん・安く発電すること」は、両立できるのかな？',
+    lesson: 'クリーンな再エネは、発電量やコストで火力・原子力に届きにくい。理想と現実のバランスを考えます。',
   },
   {
-    id: 'semiconductor',
-    title: '最先端半導体工場の誘致：1秒の停電も許さない',
-    flavor:
-      '地域に世界最新鋭の半導体工場が建設された。半導体製造には、1秒の停電や電圧低下も許されない「完璧に安定した電気」が大量に必要だ！',
-    lesson:
-      'ただ発電するだけでなく、電気の「質（安定性・周波数の維持）」を担保する調整技術が必要不可欠であることを学びます。',
-    scoreStats: [
-      { stat: 'safety', weight: 2 }, // 停電を許さない＝安全性重視
-      { stat: 'output', weight: 1 },
-    ],
-    conditions: [
-      { stat: 'output', min: 11 },
-      { stat: 'safety', min: 12 },
-    ],
-    requireOneOf: {
-      tags: ['stabilizer', 'baseload-power'],
-      label:
-        '「系統安定・調整（揚水・蓄電池）」または「ベースロード電源（水力・地熱・原子力）」のカードが1枚以上必要',
-    },
+    id: 'household',
+    title: 'お母さん',
+    emoji: '👛',
+    flavor: '毎月の電気代が高くて大変…。安くつくれる電気がいいわ。',
+    spotlight: 'efficiency', // 効率（コスト）
+    question:
+      '安く発電できるカードには、どんな特徴があった？「安さ」だけでカードを選ぶと、環境や安全、CO₂はどうなってしまうだろう？',
+    lesson: '安く効率よくつくれる電源は、環境や安全で課題があることも。コストだけでは決められません。',
   },
   {
-    id: 'fuel-price-surge',
-    title: '燃料価格の急騰：電気代を安く抑えよ',
-    flavor:
-      '世界情勢の悪化により、輸入している石炭、石油、LNGの価格がトリプル高騰！家計や工場の電気代を抑えるため、国産エネルギーと低コストの発電方法を選択せよ！',
-    lesson:
-      '日本の「エネルギー自給率の低さ（約12%）」が、世界情勢によって人々の経済生活（電気代）に直接大打撃を与えるリスクを学びます。',
-    scoreStats: [
-      { stat: 'efficiency', weight: 1 },
-      { stat: 'selfSufficiency', weight: 1 },
-      { stat: 'output', weight: 1 },
-    ],
-    conditions: [
-      { stat: 'output', min: 10 },
-      { stat: 'efficiency', min: 11 },
-      { stat: 'selfSufficiency', min: 10 },
-    ],
+    id: 'disaster',
+    title: '防災担当',
+    emoji: '🚨',
+    flavor: '地震や台風でも、止まらない安全な電気を守りたい。',
+    spotlight: 'safety', // 安全性
+    question:
+      '「止まらない安全な電気」には、どんなカードが向いていた？ 安全な電源だけをそろえたとき、必要な電気の“量”は足りたかな？',
+    lesson: '安全で止まりにくい電源をそろえたい。でも安全な電源は出力が小さめなことも多いです。',
   },
   {
-    id: 'smart-community',
-    title: '地方創生：分散型スマートコミュニティ',
-    flavor:
-      '巨大な発電所に頼るのではなく、地域にある資源（温泉、ゴミ、森林、川の流れなど）を活用し、災害に強くて自立した「エコタウン」を構築せよ！',
-    lesson:
-      '大規模集中型発電のメリット（大出力）と、分散型エネルギーシステム（災害時の強さ、地域資源の有効利用）のメリットを比較・評価します。',
-    scoreStats: [
-      { stat: 'environment', weight: 1 },
-      { stat: 'selfSufficiency', weight: 1 },
-      { stat: 'output', weight: 1 },
-    ],
-    conditions: [
-      { stat: 'output', min: 10 },
-      { stat: 'environment', min: 12 },
-    ],
-    bannedTag: {
-      tag: 'large-scale',
-      label: '「大規模発電（原子力、大型石炭火力、大型ダム水力）」は場に出せない',
-    },
+    id: 'energy-security',
+    title: '国のエネルギー担当',
+    emoji: '🗾',
+    flavor: '日本は燃料の多くを輸入だのみ…。国産でつくれる電気を増やしたい。',
+    spotlight: 'selfSufficiency', // 自給率
+    question:
+      '国産でつくれる電気（自給率が高いカード）は、どんな種類が多かった？ それらだけにたよると、天気の悪い日はどうなるだろう？',
+    lesson: '国産（自給率が高い）電源は再エネ中心で天候に左右されがち。安定供給との両立が課題です。',
   },
 ];
 
-// ---- イベントカード（トラブル・5種） ----
+// ---- イベントカード（ふつうモードのみ・効果は1つだけ） ----
+// やさしいモードでは出ません。ふつうモードで慣れてきたら「もう一波乱」を足す役。
 
 export const EVENT_CARDS: EventCard[] = [
   {
-    id: 'rainy-season',
-    title: '梅雨入り・長雨（曇天）',
-    text: '場に出ているすべての「太陽光発電（住宅用・メガソーラー）」の発電量を0にする。',
-    lesson:
-      '太陽光発電の最大の弱点である「天候依存性」を体感し、火力や揚水発電によるバックアップの必要性に気づきます。',
+    id: 'calm',
+    title: '平常運転',
+    text: '今回は天気も世界も落ち着いている。特別なことは起きない。',
+    lesson: '',
+    effects: [],
+  },
+  {
+    id: 'rainy',
+    title: '長雨（曇りつづき）',
+    text: '太陽が出ず、太陽光発電の発電量が0になる。',
+    question: '太陽光が止まってしまったこんな日、電気を止めないためには、どんなカードがあると安心だった？',
+    lesson: '太陽光は天気に左右されます。だから他の電源と組み合わせる（ミックスする）必要があります。',
     effects: [{ kind: 'zero-output-by-tag', tag: 'solar' }],
   },
   {
-    id: 'no-wind',
-    title: '太平洋高気圧の停滞（無風状態）',
-    text: '場に出ているすべての「風力発電（陸上・洋上着床・洋上浮体）」の発電量を0にする。',
-    lesson:
-      '太陽光だけでなく、風力も自然現象に左右されること、それらを複数組み合わせる（多様化する）意味を学びます。',
+    id: 'windless',
+    title: '無風（風がやんだ）',
+    text: '風がまったく吹かず、風力発電の発電量が0になる。',
+    question: '太陽光も風力も、自然しだいで止まることがある。もし両方が止まる日が来たら、何にたよればいいだろう？',
+    lesson: '風力も自然しだい。太陽光と風力だけに頼ると、両方止まる日に困ってしまいます。',
     effects: [{ kind: 'zero-output-by-tag', tag: 'wind' }],
   },
   {
-    id: 'sealane-blockade',
-    title: 'シーレーン（燃料輸送ルート）の封鎖',
-    text: '自給率が1の発電カード（石油火力、石炭火力など）は、効率性の数値を一律-4（コスト増）とする。',
-    lesson:
-      '資源のほぼ全てを海外に依存している日本のエネルギーセキュリティ（燃料調達リスク）の現実を学びます。',
-    effects: [
-      { kind: 'stat-penalty', ifStat: 'selfSufficiency', lte: 1, modify: 'efficiency', add: -4 },
-    ],
+    id: 'fuel-price-surge',
+    title: '燃料価格の高騰',
+    text: '輸入した燃料の値段が急上昇。自給率が低い（輸入だのみの）発電所は効率が下がる（-2）。',
+    question: '燃料を輸入にたよると、なぜ電気代まで上がってしまうのだろう？ 日本にできることは何かな？',
+    lesson: '燃料を輸入に頼ると、世界の情勢しだいで電気代が上がってしまうリスクがあります。',
+    effects: [{ kind: 'stat-penalty', ifStat: 'selfSufficiency', lte: 2, modify: 'efficiency', add: -2 }],
   },
   {
-    id: 'typhoon',
-    title: '猛烈な台風の接近',
-    text: 'すべての太陽光、風力カードの発電量は0になる。ただし、場に出ているすべての「水力発電（一般・中小水力・揚水）」は、豊富な水量により発電量が＋2される。',
-    lesson:
-      '自然災害は発電の脅威になる一方で、その力を味方にできるエネルギー変換技術（水力）もあるという多角的な視点を学びます。',
-    effects: [
-      { kind: 'zero-output-by-tag', tag: 'solar' },
-      { kind: 'zero-output-by-tag', tag: 'wind' },
-      { kind: 'boost-by-tag', tag: 'hydro-boost', stat: 'output', add: 2 },
-    ],
-  },
-  {
-    id: 'grid-overload',
-    title: '送電網（系統）の負荷増大',
-    text: '自分の場に「揚水発電」または「産業用大型蓄電池」のカードが出ていないプレイヤーは、送電制限ペナルティとして発電量の合計値から-4される。',
-    lesson:
-      '電気は「つくる技術」と同じくらい、「ためる技術」や「送る技術（送電網の安定化）」が社会を維持するために極めて重要であることを学びます。',
-    effects: [
-      {
-        kind: 'team-penalty-unless-tag',
-        tags: ['stabilizer'],
-        add: -4,
-        label: '揚水発電・蓄電池が場にないため送電制限ペナルティ（発電量合計-4）',
-      },
-    ],
+    id: 'heatwave',
+    title: '猛暑（ギラギラの晴れ）',
+    text: '強い日ざしで、太陽光発電の発電量が+2される。',
+    question: '晴れの日、太陽光は大かつやく。でも天気は毎日変わる。天気だのみの電源だけで、一年中だいじょうぶかな？',
+    lesson: '天気は敵にも味方にもなります。晴れの日に強い太陽光の「良い面」も体感しましょう。',
+    effects: [{ kind: 'boost-by-tag', tag: 'solar', stat: 'output', add: 2 }],
   },
 ];

@@ -16,7 +16,6 @@ import type {
   PlayerResult,
   ScoreBreakdown,
   Seat,
-  StatKey,
   Stats,
 } from './types';
 import { STAT_KEYS, STAT_LABELS } from './types';
@@ -43,11 +42,6 @@ const zeroStats = (): Stats => ({
   environment: 0,
 });
 
-/** ミッションで場に出せないカードか */
-export function isBanned(card: PlantCard, mission: MissionCard | null): boolean {
-  return !!mission?.bannedTag && card.tags.includes(mission.bannedTag.tag);
-}
-
 /** 1対戦（2プレイヤー）ぶんを一括判定する */
 export function judgeMatch(
   mission: MissionCard,
@@ -66,12 +60,6 @@ export function judgeMatch(
       .map((card) => ({ card, stats: { ...card.stats }, stopped: false, notes: [] }));
 
     for (const c of calcs) {
-      // ミッションの特別ルール（例: 大寒波で太陽光の発電量-2）
-      if (mission.statAdjust && c.card.tags.includes(mission.statAdjust.tag)) {
-        c.stats[mission.statAdjust.stat] += mission.statAdjust.add;
-        c.notes.push(mission.statAdjust.note);
-      }
-
       // イベント効果
       const isBaseload = c.card.effect?.kind === 'baseload';
       let baseloadNoted = false;
@@ -122,8 +110,7 @@ export function judgeMatch(
   );
 
   // 3. カードの特殊効果
-  const isWinter = !!mission.winter;
-  const isFuelSurge = mission.id === 'fuel-price-surge';
+  const isFuelSurge = event?.id === 'fuel-price-surge';
   for (const p of players) {
     for (const c of p.calcs) {
       const eff = c.card.effect;
@@ -141,13 +128,12 @@ export function judgeMatch(
 
       if (eff.kind === 'backup-oil' && wantsOn) {
         const ownStopped = p.calcs.some((x) => x.stopped);
-        if (ownStopped || isWinter) {
+        if (ownStopped) {
           const amount = isFuelSurge ? eff.amountFuelSurge : eff.amountDefault;
           c.stats.output += amount;
-          const reason = ownStopped ? '自分の場に停止カードあり' : '天候が冬';
-          c.notes.push(`【${eff.keyword}】${reason}のため発電量+${amount}`);
+          c.notes.push(`【${eff.keyword}】自分の場に停止カードありのため発電量+${amount}`);
         } else {
-          c.notes.push(`【${eff.keyword}】条件未成立（停止カードなし・冬でもない）のため不発`);
+          c.notes.push(`【${eff.keyword}】条件未成立（停止カードなし）のため不発`);
         }
       }
 
@@ -220,71 +206,31 @@ export function judgeMatch(
       }
     }
 
-    // ---- スコア計算（ポーカー風「どれだけ攻略できたか」） ----
+    // ---- スコア計算 ----
+    // ① 5つの力の合計（バランスよく高いほど良い）
+    // ② 今回の注目ステータスはもう一度加算（＝実質×2）
+    // ③ 3種類ちがう電源を混ぜたら「エネルギーミックス・ボーナス」
     const breakdown: ScoreBreakdown[] = [];
     const played = calcs.length > 0;
 
-    // ① ミッションが評価する指標の合計（重み付き）
-    for (const s of mission.scoreStats) {
-      const raw = totals[s.stat];
-      const value = raw * s.weight;
-      breakdown.push({
-        label:
-          s.weight === 1
-            ? `${STAT_LABELS[s.stat]}の合計`
-            : `${STAT_LABELS[s.stat]}の合計 ×${s.weight}`,
-        value,
-      });
-    }
-
-    // ② 各条件の達成状況（満たすごとにボーナス、全部満たすと完全クリア）
-    const conditionStatus: { label: string; ok: boolean }[] = [];
-    let metCount = 0;
-    for (const cond of mission.conditions) {
-      const ok = totals[cond.stat] >= cond.min;
-      if (ok) metCount++;
-      conditionStatus.push({
-        label: `${STAT_LABELS[cond.stat]} ${cond.min}以上（現在 ${totals[cond.stat]}）`,
-        ok,
-      });
-    }
-    if (metCount > 0) {
-      breakdown.push({ label: `条件達成ボーナス（${metCount}個）`, value: metCount * 3 });
-    }
-
-    // ③ 必須カード条件（満たすとボーナス、無いと減点）
-    let requireOk = true;
-    if (mission.requireOneOf && played) {
-      requireOk = calcs.some((c) =>
-        mission.requireOneOf!.tags.some((t) => c.card.tags.includes(t)),
-      );
-      conditionStatus.push({ label: mission.requireOneOf.label, ok: requireOk });
-      breakdown.push({
-        label: requireOk ? '必須カード条件クリア' : '必須カードなし（減点）',
-        value: requireOk ? 3 : -5,
-      });
-    }
-
-    // ④ ポーカー風のコンボボーナス
     if (played) {
+      const baseTotal = STAT_KEYS.reduce((sum, k) => sum + totals[k], 0);
+      breakdown.push({ label: '5つの力の合計', value: baseTotal });
+
+      breakdown.push({
+        label: `注目【${STAT_LABELS[mission.spotlight]}】ボーナス（もう一度加算）`,
+        value: totals[mission.spotlight],
+      });
+
       const cats = new Set(calcs.map((c) => c.card.category));
-      if (calcs.length === 3 && cats.size === 1) {
-        breakdown.push({ label: '同カテゴリ3枚そろい（フラッシュ）', value: 4 });
-      } else if (calcs.length === 3 && cats.size === 3) {
-        breakdown.push({ label: '3種のカテゴリ（多様性ボーナス）', value: 3 });
+      if (calcs.length === 3 && cats.size === 3) {
+        breakdown.push({ label: '⚡ エネルギーミックス・ボーナス（3種類）', value: 6 });
+      } else if (cats.size === 2) {
+        breakdown.push({ label: '2種類の組み合わせボーナス', value: 2 });
       }
     }
 
-    // ⑤ 出禁カードを使っていたら大きく減点
-    const bannedUsed = calcs.filter((c) => isBanned(c.card, mission));
-    for (const b of bannedUsed) {
-      breakdown.push({ label: `「${b.card.name}」は出禁カード（大幅減点）`, value: -10 });
-    }
-
-    const score = played ? breakdown.reduce((sum, b) => sum + b.value, 0) : 0;
-    const cleared = played && metCount === mission.conditions.length && requireOk && bannedUsed.length === 0;
-    if (cleared) breakdown.push({ label: '🎉 完全クリアボーナス', value: 5 });
-    const finalScore = cleared ? score + 5 : score;
+    const score = played ? Math.max(0, breakdown.reduce((sum, b) => sum + b.value, 0)) : 0;
 
     return {
       seat: entry.seat,
@@ -292,10 +238,8 @@ export function judgeMatch(
       cards,
       totals,
       teamNotes,
-      score: Math.max(0, finalScore),
+      score,
       breakdown,
-      cleared,
-      conditionStatus,
       winner: false,
       draw: false,
       points: 0,
@@ -332,35 +276,9 @@ export function decideWinner(results: PlayerResult[]): void {
   }
 }
 
-/** ミッションのスコア対象を人が読める形にする（画面表示用） */
-export function missionScoreText(mission: MissionCard): string {
-  return mission.scoreStats
-    .map((s) =>
-      s.weight === 1 ? STAT_LABELS[s.stat] : `${STAT_LABELS[s.stat]}（×${s.weight}）`,
-    )
-    .join('＋');
-}
-
-/** ミッションの目標条件（達成でボーナス）を人が読める形にする（画面表示用） */
-export function missionConditionText(mission: MissionCard): string {
-  if (mission.conditions.length === 0) return '（目標条件なし・スコアを稼ごう）';
-  return mission.conditions
-    .map((c) =>
-      c.stat === 'output'
-        ? `発電量 ${c.min} 以上`
-        : `${STAT_LABELS[c.stat]}の合計 ${c.min} 以上`,
-    )
-    .join('、');
-}
-
-/** ミッションの特別ルール文を列挙する（画面表示用） */
-export function missionSpecialRules(mission: MissionCard): string[] {
-  const rules: string[] = [];
-  if (mission.bannedTag) rules.push(mission.bannedTag.label);
-  if (mission.requireOneOf) rules.push(mission.requireOneOf.label);
-  if (mission.statAdjust) rules.push(mission.statAdjust.note);
-  if (mission.winter) rules.push('天候は「冬」扱い（石油火力の【バックアップ】が使用可能）');
-  return rules;
+/** ミッションの注目ステータス名（画面表示用） */
+export function missionSpotlightLabel(mission: MissionCard): string {
+  return STAT_LABELS[mission.spotlight];
 }
 
 /** 任意効果（発動するかを選べる効果）を持つカードか */

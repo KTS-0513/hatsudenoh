@@ -1011,3 +1011,215 @@ body {
 .condition-status .ng {
   color: #b45309;
 }
+
+/* ---- 立場ミッション & バランス棒グラフ（学び向上アップデート） ---- */
+
+.panels.single {
+  grid-template-columns: 1fr;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.spotlight-badge {
+  margin-top: 8px;
+  display: inline-block;
+  background: #fff7e0;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.spotlight-badge b {
+  color: var(--accent-dark);
+  font-size: 1.15em;
+}
+
+.balance-bars {
+  margin: 8px 0 10px;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.balance-title {
+  font-weight: 900;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  color: #555;
+}
+
+.balance-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.balance-label {
+  width: 5.2em;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.balance-track {
+  flex: 1;
+  height: 14px;
+  background: #e2e8f0;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.balance-fill {
+  display: block;
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 7px;
+}
+
+.balance-row.spot .balance-fill {
+  background: var(--accent);
+}
+
+.balance-row.spot .balance-label {
+  color: var(--accent-dark);
+}
+
+.balance-num {
+  width: 1.6em;
+  text-align: right;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+/* ---- あそびかた（説明画面 / オーバーレイ） ---- */
+
+.howto-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.howto-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 36, 48, 0.55);
+  z-index: 50;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.howto-card {
+  background: var(--panel);
+  border: 3px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 5px 5px 0 var(--border);
+  padding: 18px 22px;
+  max-width: 720px;
+  width: 100%;
+}
+
+.howto-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  padding-top: 4px;
+}
+
+.howto-title {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: var(--accent-dark);
+}
+
+.howto-sec {
+  margin-top: 16px;
+}
+
+.howto-sec h2 {
+  font-size: 1.2rem;
+  font-weight: 900;
+  border-left: 6px solid var(--accent);
+  padding-left: 10px;
+  margin-bottom: 6px;
+}
+
+.howto-sec p {
+  font-size: 1rem;
+}
+
+.howto-steps {
+  padding-left: 1.4em;
+  font-size: 1.02rem;
+}
+
+.howto-steps li {
+  margin: 6px 0;
+}
+
+.howto-points,
+.howto-stats {
+  padding-left: 1.3em;
+}
+
+.howto-points li,
+.howto-stats li {
+  margin: 5px 0;
+}
+
+.howto-tip {
+  margin-top: 8px;
+  background: #fff7e0;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+}
+
+.howto-foot {
+  margin-top: 20px;
+  text-align: center;
+}
+
+/* ---- 考えてみよう（問いかけ・答えは出さない） ---- */
+
+.reflect {
+  background: #eef6ff;
+  border: 3px solid var(--primary);
+  border-radius: 14px;
+  padding: 14px 18px;
+  text-align: left;
+  box-shadow: 4px 4px 0 var(--primary);
+}
+
+.reflect > b {
+  font-size: 1.15rem;
+}
+
+.reflect-q {
+  margin-top: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding-left: 1.1em;
+  position: relative;
+}
+
+.reflect-q::before {
+  content: 'Q.';
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  font-weight: 900;
+}

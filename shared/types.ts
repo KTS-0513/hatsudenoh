@@ -99,15 +99,12 @@ export interface PlantCard {
 
 export interface MissionCard {
   id: string;
-  title: string;
-  flavor: string; // 社会の状況（背景）
-  lesson?: string; // 技術科としての教訓
-  scoreStats: { stat: StatKey; weight: number }[]; // スコアに数える指標と重み（例: 環境を2倍で評価）
-  conditions: { stat: StatKey; min: number }[]; // すべて満たすと「完全クリア」ボーナス（達成しなくても点は入る）
-  bannedTag?: { tag: string; label: string }; // このタグのカードは場に出せない
-  requireOneOf?: { tags: string[]; label: string }; // いずれかのタグのカードが1枚以上必要
-  statAdjust?: { tag: string; stat: StatKey; add: number; note: string }; // 例: 大寒波で太陽光-2
-  winter?: boolean; // 天候が冬扱い（石油の【バックアップ】発動条件）
+  title: string; // 立場（例: 工場長）
+  emoji: string; // 立場のアイコン
+  flavor: string; // その人の「ひとこと」の願い
+  spotlight: StatKey; // 今回いちばん注目する力（採点で×2）
+  question: string; // ゲーム後に考える「問い」（答えは教えない）
+  lesson?: string; // 技術科としての教訓（先生用メモ・生徒画面には出さない）
 }
 
 // ---- イベントカード ----
@@ -122,7 +119,8 @@ export interface EventCard {
   id: string;
   title: string;
   text: string;
-  lesson?: string;
+  question?: string; // ゲーム後に考える「問い」
+  lesson?: string; // 先生用メモ
   effects: EventEffect[];
 }
 
@@ -149,11 +147,9 @@ export interface PlayerResult {
   playerName: string;
   cards: CardResult[];
   totals: Stats;
-  teamNotes: string[]; // カード単位でなくプレイヤー全体にかかった効果（送電網ペナルティ等）
-  score: number; // 「どれだけ攻略できたか」の総合スコア（高い方が勝ち）
+  teamNotes: string[]; // カード単位でなくプレイヤー全体にかかった効果
+  score: number; // 総合スコア（高い方が勝ち）
   breakdown: ScoreBreakdown[]; // スコアの内訳（生徒に見せる）
-  cleared: boolean; // 全条件を満たした（完全クリア）
-  conditionStatus: { label: string; ok: boolean }[]; // 各条件の達成状況
   winner: boolean;
   draw: boolean;
   points: number; // 勝ち点（勝ち3/引き分け2/負け1/未提出0）
@@ -199,13 +195,14 @@ export interface GameState {
   started: boolean;
   matchCount: number; // 最大10
   totalRounds: number;
+  withEvents: boolean; // false=やさしいモード（イベントなし） / true=ふつうモード
   matches: MatchState[];
 }
 
 // ---- Socket.io イベント ----
 
 export interface ClientToServer {
-  'host:setup': (opts: { matchCount: number; totalRounds: number }) => void;
+  'host:setup': (opts: { matchCount: number; totalRounds: number; withEvents: boolean }) => void;
   'host:reset': () => void;
   'player:join': (opts: { matchId: number; seat: Seat; name?: string }) => void;
   'player:reveal': (which: 'mission' | 'event') => void;

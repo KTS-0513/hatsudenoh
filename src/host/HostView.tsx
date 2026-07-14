@@ -16,6 +16,7 @@ export function HostView() {
   const error = useServerError();
   const [matchCount, setMatchCount] = useState(10);
   const [totalRounds, setTotalRounds] = useState(3);
+  const [withEvents, setWithEvents] = useState(false); // 初期は「やさしい」
   const [lanUrls, setLanUrls] = useState<string[]>([]);
 
   useEffect(() => {
@@ -63,9 +64,16 @@ export function HostView() {
               ))}
             </select>
           </label>
+          <label>
+            モード
+            <select value={withEvents ? 'normal' : 'easy'} onChange={(e) => setWithEvents(e.target.value === 'normal')}>
+              <option value="easy">やさしい（イベントなし）</option>
+              <option value="normal">ふつう（イベントあり）</option>
+            </select>
+          </label>
           <button
             className="btn primary big"
-            onClick={() => socket.emit('host:setup', { matchCount, totalRounds })}
+            onClick={() => socket.emit('host:setup', { matchCount, totalRounds, withEvents })}
           >
             ゲーム開始
           </button>
