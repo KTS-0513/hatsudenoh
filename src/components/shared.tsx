@@ -144,6 +144,23 @@ export function ResultDetail({
         <BalanceBars totals={result.totals} spotlight={mission.spotlight} />
       )}
 
+      {result.voices.length > 0 && (
+        <div className="voices">
+          <div className="voices-title">📣 社会の声</div>
+          {result.voices.map((v) => (
+            <div key={v.stat} className={`voice-row ${v.mood}`}>
+              <span className="voice-mood">
+                {v.mood === 'angry' ? '😠' : v.mood === 'happy' ? '😊' : '😐'}
+              </span>
+              <span className="voice-who">{v.who}</span>
+              <span className="voice-line">
+                {v.line ? `「${v.line}」` : '……'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {result.breakdown.length > 0 && (
         <div className="score-breakdown">
           {result.breakdown.map((b, i) => (

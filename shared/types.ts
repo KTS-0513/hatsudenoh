@@ -138,8 +138,16 @@ export interface CardResult {
 export type Seat = 'A' | 'B';
 
 export interface ScoreBreakdown {
-  label: string; // 例: "発電量の合計", "完全クリアボーナス", "多様性ボーナス"
+  label: string; // 例: "5つの力の合計", "エネルギーミックス・ボーナス", "苦情"
   value: number;
+}
+
+/** 社会の声: 5つの力それぞれを大事にしている立場の人の反応 */
+export interface SocialVoice {
+  stat: StatKey;
+  who: string; // 例: 🌳 環境団体
+  mood: 'happy' | 'angry' | 'neutral';
+  line: string; // セリフ（neutralは空）
 }
 
 export interface PlayerResult {
@@ -150,6 +158,7 @@ export interface PlayerResult {
   teamNotes: string[]; // カード単位でなくプレイヤー全体にかかった効果
   score: number; // 総合スコア（高い方が勝ち）
   breakdown: ScoreBreakdown[]; // スコアの内訳（生徒に見せる）
+  voices: SocialVoice[]; // 社会の声（苦情=減点あり、よろこび=セリフのみ）
   winner: boolean;
   draw: boolean;
   points: number; // 勝ち点（勝ち3/引き分け2/負け1/未提出0）

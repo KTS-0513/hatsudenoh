@@ -144,6 +144,68 @@ describe('スコア計算（注目×2 ＋ 5つの力の合計 ＋ 多様性）',
   });
 });
 
+describe('社会の声（トレードオフの代償）', () => {
+  it('低すぎる力があると、その立場の人から苦情が来て-4される', () => {
+    // 化石燃料3枚: 自給率1+1+2=4、環境1+1+2=4 → 2件の苦情
+    const [r] = judgeMatch(
+      mission('factory'),
+      event('calm'),
+      [entry('A', ['coal', 'oil', 'lng'])],
+      PLANT_CARDS,
+    );
+    const complaints = r.breakdown.filter((b) => b.label.includes('苦情'));
+    expect(complaints.length).toBe(2);
+    expect(complaints.every((b) => b.value === -4)).toBe(true);
+    expect(r.voices.some((v) => v.mood === 'angry' && v.who.includes('環境団体'))).toBe(true);
+    expect(r.voices.some((v) => v.mood === 'angry' && v.who.includes('エネルギー担当'))).toBe(true);
+  });
+
+  it('バランスの良い組み合わせなら苦情ゼロで、よろこびの声が出る', () => {
+    // 原子力+陸上風力+ダム水力: すべての力が7以上
+    const [r] = judgeMatch(
+      mission('factory'),
+      event('calm'),
+      [entry('A', ['nuclear', 'onshore-wind', 'dam-hydro'])],
+      PLANT_CARDS,
+    );
+    expect(r.breakdown.some((b) => b.label.includes('苦情'))).toBe(false);
+    expect(r.voices.some((v) => v.mood === 'happy')).toBe(true);
+    expect(r.voices.length).toBe(5); // 5人全員の反応が並ぶ
+  });
+
+  it('環境全振りだと発電量の苦情が来る（逆方向のトレードオフも働く）', () => {
+    // 住宅太陽光+洋上浮体+バイナリー: 発電量1+1+1=3 → 工場長から苦情
+    const [r] = judgeMatch(
+      mission('environment'),
+      event('calm'),
+      [entry('A', ['res-solar', 'offshore-wind', 'binary'])],
+      PLANT_CARDS,
+    );
+    expect(
+      r.breakdown.some((b) => b.label.includes('苦情') && b.label.includes('工場長')),
+    ).toBe(true);
+  });
+
+  it('苦情のぶんスコアが下がる（数字を大きくするだけでは勝てない）', () => {
+    // 出力特化（苦情2件）とバランス型を工場長ミッションで比較
+    const results = judgeMatch(
+      mission('factory'), // 注目=発電量
+      event('calm'),
+      [
+        entry('A', ['coal', 'oil', 'lng']), // 出力15だが苦情2件
+        entry('B', ['nuclear', 'onshore-wind', 'dam-hydro']), // 出力11・苦情なし
+      ],
+      PLANT_CARDS,
+    );
+    const a = results.find((r) => r.seat === 'A')!;
+    const b = results.find((r) => r.seat === 'B')!;
+    // 出力で上回っても、苦情の分で差が縮む/逆転する構図になっていること
+    expect(a.breakdown.filter((x) => x.label.includes('苦情')).length).toBe(2);
+    expect(b.breakdown.filter((x) => x.label.includes('苦情')).length).toBe(0);
+    expect(b.score).toBeGreaterThanOrEqual(a.score - 5); // 少なくとも接戦になる
+  });
+});
+
 describe('勝敗', () => {
   it('スコアが高い方が勝ち（3pt / 1pt）', () => {
     const results = judgeMatch(

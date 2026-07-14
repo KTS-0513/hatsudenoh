@@ -16,6 +16,8 @@ import type {
   PlayerResult,
   ScoreBreakdown,
   Seat,
+  SocialVoice,
+  StatKey,
   Stats,
 } from './types';
 import { STAT_KEYS, STAT_LABELS } from './types';
@@ -41,6 +43,41 @@ const zeroStats = (): Stats => ({
   efficiency: 0,
   environment: 0,
 });
+
+// ---- 社会の声（トレードオフの代償を見える化する仕組み） ----
+// 3枚合計がCOMPLAINT_THRESHOLD以下の力があると、その力を大事にする立場の人から苦情＝減点。
+// HAPPY_THRESHOLD以上ならよろこびのセリフ（点数はなし。合計にはすでに入っているため）。
+export const COMPLAINT_THRESHOLD = 6;
+export const COMPLAINT_PENALTY = 4;
+export const HAPPY_THRESHOLD = 11;
+
+export const STAKEHOLDERS: Record<StatKey, { who: string; angry: string; happy: string }> = {
+  output: {
+    who: '🏭 工場長',
+    angry: '電気が足りないよ！これでは工場も家も止まってしまう…',
+    happy: 'たっぷり電気があって助かるよ！',
+  },
+  safety: {
+    who: '🚨 防災担当',
+    angry: '事故や停電が心配だ…この組み合わせで本当に大丈夫か？',
+    happy: 'これなら災害のときも安心だ！',
+  },
+  selfSufficiency: {
+    who: '🗾 国のエネルギー担当',
+    angry: '輸入ばかりだ…燃料が来なくなったらどうするんだ…',
+    happy: '国産の電気が多くて心強い！',
+  },
+  efficiency: {
+    who: '👛 お母さん',
+    angry: '電気代が高すぎるわ…家計がもたない…',
+    happy: '電気代が安くてうれしいわ！',
+  },
+  environment: {
+    who: '🌳 環境団体',
+    angry: '空気や自然がよごれてしまう…未来の地球はどうなるの…',
+    happy: '地球にやさしい電気ですね！',
+  },
+};
 
 /** 1対戦（2プレイヤー）ぶんを一括判定する */
 export function judgeMatch(
@@ -210,7 +247,9 @@ export function judgeMatch(
     // ① 5つの力の合計（バランスよく高いほど良い）
     // ② 今回の注目ステータスはもう一度加算（＝実質×2）
     // ③ 3種類ちがう電源を混ぜたら「エネルギーミックス・ボーナス」
+    // ④ 低すぎる力があると、その力を大事にする立場の人から「苦情」＝減点（トレードオフの代償）
     const breakdown: ScoreBreakdown[] = [];
+    const voices: SocialVoice[] = [];
     const played = calcs.length > 0;
 
     if (played) {
@@ -228,6 +267,22 @@ export function judgeMatch(
       } else if (cats.size === 2) {
         breakdown.push({ label: '2種類の組み合わせボーナス', value: 2 });
       }
+
+      // 社会の声: 切り捨てた力の向こうには、困る人がいる
+      for (const k of STAT_KEYS) {
+        const s = STAKEHOLDERS[k];
+        if (totals[k] <= COMPLAINT_THRESHOLD) {
+          voices.push({ stat: k, who: s.who, mood: 'angry', line: s.angry });
+          breakdown.push({
+            label: `😠 ${s.who}から苦情（${STAT_LABELS[k]}が低すぎる）`,
+            value: -COMPLAINT_PENALTY,
+          });
+        } else if (totals[k] >= HAPPY_THRESHOLD) {
+          voices.push({ stat: k, who: s.who, mood: 'happy', line: s.happy });
+        } else {
+          voices.push({ stat: k, who: s.who, mood: 'neutral', line: '' });
+        }
+      }
     }
 
     const score = played ? Math.max(0, breakdown.reduce((sum, b) => sum + b.value, 0)) : 0;
@@ -240,6 +295,7 @@ export function judgeMatch(
       teamNotes,
       score,
       breakdown,
+      voices,
       winner: false,
       draw: false,
       points: 0,

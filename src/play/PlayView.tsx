@@ -239,6 +239,10 @@ export function PlayView() {
           <div className="panel-title">
             手札からベスト3枚を選ぼう（{selected.length} / 3枚）
           </div>
+          <p className="hint">
+            ⚠ どれかの力が低すぎる（3枚合計6以下）と、その力を大事にする人から<b>苦情</b>が来て減点！
+            バランスも考えよう
+          </p>
           {!me.mulliganUsed && (
             <button className="btn mulligan" onClick={() => setMulliganMode(true)}>
               🔄 手札を交換する（1回だけ・最大4枚）
