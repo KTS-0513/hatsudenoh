@@ -1506,3 +1506,67 @@ body {
   font-size: 1.15rem;
   line-height: 1.7;
 }
+
+/* ---- カードいちらん（図鑑） ---- */
+.cardlist {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+.cardlist-head {
+  text-align: center;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.cardlist-head .btn.tiny {
+  position: absolute;
+  left: 0;
+  top: 4px;
+}
+
+.cardlist-title {
+  font-size: 1.7rem;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.cardlist-lead {
+  color: var(--ink);
+  opacity: 0.85;
+  margin: 0;
+}
+
+.cardlist-section {
+  margin-bottom: 28px;
+}
+
+.cardlist-cat {
+  font-size: 1.2rem;
+  color: var(--ink);
+  border-left: 8px solid var(--primary);
+  padding-left: 10px;
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cardlist-cat-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: var(--ink);
+}
+
+@media (max-width: 700px) {
+  .cardlist-head .btn.tiny {
+    position: static;
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+}

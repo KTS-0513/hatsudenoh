@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { HostView } from './host/HostView';
 import { PlayView } from './play/PlayView';
 import { HowToPlay } from './HowToPlay';
+import { CardListView } from './CardListView';
 import { LogoImage } from './components/shared';
 
 // react-routerを使わないシンプルなハッシュルーティング
@@ -21,6 +22,7 @@ export function App() {
   if (hash.startsWith('#/host')) return <HostView />;
   if (hash.startsWith('#/play') || hash.startsWith('#/group')) return <PlayView />;
   if (hash.startsWith('#/how')) return <HowToPlay />;
+  if (hash.startsWith('#/cards')) return <CardListView />;
   return <Landing />;
 }
 
@@ -56,6 +58,9 @@ function Landing() {
         </a>
         <a className="btn big" href="#/how">
           📖 くわしいあそびかた
+        </a>
+        <a className="btn big" href="#/cards">
+          🃏 カードいちらん
         </a>
         <a className="btn big" href="#/host">
           先生用モニター
