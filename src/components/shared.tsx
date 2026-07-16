@@ -78,20 +78,35 @@ export function CardChip({
   disabled,
   disabledReason,
   onClick,
+  onZoom,
 }: {
   card: PlantCard;
   selected?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   onClick?: () => void;
+  onZoom?: () => void;
 }) {
   return (
-    <button
+    <div
       className={`card-chip ${CATEGORY_CLASS[card.category] ?? ''} ${selected ? 'selected' : ''} ${card.placeholder ? 'placeholder' : ''} ${disabled ? 'banned' : ''}`}
-      onClick={onClick}
-      disabled={disabled}
-      type="button"
+      onClick={disabled ? undefined : onClick}
+      role="button"
+      aria-disabled={disabled}
     >
+      {onZoom && (
+        <button
+          type="button"
+          className="zoom-btn"
+          title="大きく見る"
+          onClick={(e) => {
+            e.stopPropagation();
+            onZoom();
+          }}
+        >
+          🔍 大きく
+        </button>
+      )}
       <CardImage card={card} />
       <div className="card-chip-head">
         <span className="card-category">{card.category}</span>
@@ -105,7 +120,43 @@ export function CardChip({
         </div>
       )}
       {disabled && <div className="banned-label">🚫 {disabledReason ?? 'このミッションでは出せない'}</div>}
-    </button>
+    </div>
+  );
+}
+
+/** カードを大きく表示するオーバーレイ（効果文が読みやすいように） */
+export function CardDetail({ card, onClose }: { card: PlantCard; onClose: () => void }) {
+  return (
+    <div className="card-detail-overlay" onClick={onClose}>
+      <div
+        className={`card-detail ${CATEGORY_CLASS[card.category] ?? ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="btn tiny cd-close" onClick={onClose}>
+          × とじる
+        </button>
+        <CardImage card={card} />
+        <div className="cd-head">
+          <span className="card-category">{card.category}</span>
+          <h2 className="cd-name">{card.name}</h2>
+        </div>
+        {card.catchCopy && <div className="cd-catch">{card.catchCopy}</div>}
+        <div className="cd-stats">
+          {STAT_KEYS.map((k) => (
+            <div key={k} className="cd-stat">
+              <span className="cd-stat-label">{STAT_LABELS[k]}</span>
+              <span className="cd-stat-value">{card.stats[k]}</span>
+            </div>
+          ))}
+        </div>
+        {card.effect && (
+          <div className="cd-effect">
+            <b>【{card.effect.keyword}】</b>
+            {card.effect.text}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

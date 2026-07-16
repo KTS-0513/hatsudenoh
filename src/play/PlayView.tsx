@@ -5,7 +5,14 @@ import { PLANT_CARDS } from '../../shared/data';
 import { hasOptionalEffect } from '../../shared/engine';
 import type { MatchState, PlantCard, Seat } from '../../shared/types';
 import { socket, useGameState, useHand, useServerError } from '../socket';
-import { CardBack, CardChip, EventPanel, MissionPanel, ResultDetail } from '../components/shared';
+import {
+  CardBack,
+  CardChip,
+  CardDetail,
+  EventPanel,
+  MissionPanel,
+  ResultDetail,
+} from '../components/shared';
 import { HowToPlay } from '../HowToPlay';
 
 const STORAGE_KEY = 'hatsuden-player';
@@ -37,6 +44,7 @@ export function PlayView() {
   const [mulliganMode, setMulliganMode] = useState(false);
   const [swapSel, setSwapSel] = useState<string[]>([]); // 交換するカード
   const [showHelp, setShowHelp] = useState(false);
+  const [zoomId, setZoomId] = useState<string | null>(null);
 
   // 再接続・リロード時に自動で同じ席へ戻る
   useEffect(() => {
@@ -146,6 +154,7 @@ export function PlayView() {
     <div className="play">
       {error && <div className="toast">{error}</div>}
       {showHelp && <HowToPlay onClose={() => setShowHelp(false)} />}
+      {zoomId && <CardDetail card={cardById(zoomId)} onClose={() => setZoomId(null)} />}
       <header className="group-header">
         <span className="group-name">
           対戦{match.id}　{me.name} <span className="vs">vs</span> {opponent.name}
@@ -225,6 +234,7 @@ export function PlayView() {
                   key={id}
                   card={c}
                   selected={swapSel.includes(id)}
+                  onZoom={() => setZoomId(id)}
                   onClick={() =>
                     setSwapSel((prev) =>
                       prev.includes(id)
@@ -275,6 +285,7 @@ export function PlayView() {
                   key={id}
                   card={c}
                   selected={selected.includes(id)}
+                  onZoom={() => setZoomId(id)}
                   onClick={() => toggleCard(id)}
                 />
               );
